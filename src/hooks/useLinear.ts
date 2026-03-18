@@ -13,6 +13,66 @@ interface UseLinearResult {
   refresh: () => void
 }
 
+const ISSUES_QUERY = `
+  query MyIssues {
+    viewer {
+      id
+      assignedIssues(
+        filter: { state: { type: { nin: ["cancelled"] } } }
+        first: 100
+        orderBy: updatedAt
+      ) {
+        nodes {
+          id
+          identifier
+          title
+          url
+          description
+          priority
+          state { id name type }
+          labels { nodes { id name } }
+          project { id name }
+        }
+      }
+      teams {
+        nodes {
+          id
+          activeCycle { id number startsAt endsAt }
+          states { nodes { id name type } }
+        }
+      }
+    }
+  }
+`
+
+interface GqlResponse {
+  data: {
+    viewer: {
+      id: string
+      assignedIssues: {
+        nodes: {
+          id: string
+          identifier: string
+          title: string
+          url: string
+          description: string | null
+          priority: number
+          state: { id: string; name: string; type: string }
+          labels: { nodes: { id: string; name: string }[] }
+          project: { id: string; name: string } | null
+        }[]
+      }
+      teams: {
+        nodes: {
+          id: string
+          activeCycle: { id: string; number: number; startsAt: string; endsAt: string } | null
+          states: { nodes: { id: string; name: string; type: string }[] }
+        }[]
+      }
+    }
+  }
+}
+
 export function useLinear(): UseLinearResult {
   const [issues, setIssues] = useState<Record<StatusCategory, DashboardIssue[]>>({
     todo: [], inProgress: [], inReview: [], deployed: [],
@@ -23,7 +83,7 @@ export function useLinear(): UseLinearResult {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchData = useCallback(async (targetCycleNumber?: number) => {
+  const fetchData = useCallback(async () => {
     if (!linearClient) {
       setError('Add your Linear API key in .env')
       setLoading(false)
@@ -34,101 +94,54 @@ export function useLinear(): UseLinearResult {
     setError(null)
 
     try {
-      const viewer = await linearClient.viewer
-      const teams = await viewer.teams()
+      const response = await linearClient.client.rawRequest(ISSUES_QUERY, {}) as GqlResponse
+      const viewer = response.data.viewer
 
-      if (teams.nodes.length === 0) {
-        setError('No teams found')
-        setLoading(false)
-        return
-      }
-
-      // Get states from all teams
+      // Collect workflow states from all teams
       const allStates: { id: string; name: string; type: string }[] = []
-      for (const team of teams.nodes) {
-        const states = await team.states()
-        allStates.push(...states.nodes.map(s => ({ id: s.id, name: s.name, type: s.type })))
+      for (const team of viewer.teams.nodes) {
+        allStates.push(...team.states.nodes)
       }
       setWorkflowStates(allStates)
 
-      // Find the target cycle
-      let targetCycle: DashboardCycle | null = null
-
-      if (targetCycleNumber) {
-        // Search across all teams for this cycle number
-        for (const team of teams.nodes) {
-          const cycles = await team.cycles({ filter: { number: { eq: targetCycleNumber } } })
-          if (cycles.nodes.length > 0) {
-            const c = cycles.nodes[0]
-            targetCycle = { id: c.id, number: c.number, startsAt: c.startsAt.toISOString(), endsAt: c.endsAt.toISOString() }
-            break
-          }
-        }
-      } else {
-        // Get active cycle from first team that has one
-        for (const team of teams.nodes) {
-          const activeCycle = await team.activeCycle
-          if (activeCycle) {
-            targetCycle = {
-              id: activeCycle.id,
-              number: activeCycle.number,
-              startsAt: activeCycle.startsAt.toISOString(),
-              endsAt: activeCycle.endsAt.toISOString(),
-            }
-            break
-          }
+      // Get active cycle from first team that has one
+      for (const team of viewer.teams.nodes) {
+        if (team.activeCycle) {
+          setCycle({
+            id: team.activeCycle.id,
+            number: team.activeCycle.number,
+            startsAt: team.activeCycle.startsAt,
+            endsAt: team.activeCycle.endsAt,
+          })
+          setCycleNumber(team.activeCycle.number)
+          break
         }
       }
 
-      if (!targetCycle) {
-        setCycle(null)
-        setError('No active cycle')
-        setLoading(false)
-        return
-      }
-
-      setCycle(targetCycle)
-      setCycleNumber(targetCycle.number)
-
-      // Fetch issues for this cycle assigned to viewer
-      const cycleRef = await linearClient.cycle(targetCycle.id)
-      const cycleIssues = await cycleRef.issues({
-        filter: { assignee: { id: { eq: viewer.id } } },
-      })
-
-      // Group by status category
+      // Group issues by status category
       const grouped: Record<StatusCategory, DashboardIssue[]> = {
         todo: [], inProgress: [], inReview: [], deployed: [],
       }
 
-      for (const issue of cycleIssues.nodes) {
-        const state = await issue.state
-        if (!state) continue
-
-        const category = categorizeState({ type: state.type, name: state.name })
-        const labelsConn = await issue.labels()
-        const projectRef = await issue.project
-
+      for (const issue of viewer.assignedIssues.nodes) {
+        if (!issue.state) continue
+        const category = categorizeState(issue.state)
         grouped[category].push({
           id: issue.id,
           identifier: issue.identifier,
           title: issue.title,
           url: issue.url,
-          description: issue.description ?? null,
+          description: issue.description,
           priority: issue.priority,
-          state: { id: state.id, name: state.name, type: state.type },
-          labels: labelsConn.nodes.map(l => ({ id: l.id, name: l.name })),
-          project: projectRef ? { id: projectRef.id, name: projectRef.name } : null,
+          state: issue.state,
+          labels: issue.labels.nodes,
+          project: issue.project,
         })
       }
 
-      // Sort each category by priority (1=urgent first)
+      // Sort by priority (1=urgent first)
       for (const key of Object.keys(grouped) as StatusCategory[]) {
-        grouped[key].sort((a, b) => {
-          const pa = a.priority || 5
-          const pb = b.priority || 5
-          return pa - pb
-        })
+        grouped[key].sort((a, b) => (a.priority || 5) - (b.priority || 5))
       }
 
       setIssues(grouped)
@@ -150,19 +163,16 @@ export function useLinear(): UseLinearResult {
 
   const navigateCycle = useCallback((direction: 'prev' | 'next') => {
     if (!cycleNumber) return
-    const target = direction === 'prev' ? cycleNumber - 1 : cycleNumber + 1
-    fetchData(target)
-  }, [cycleNumber, fetchData])
+    setCycleNumber(prev => prev ? (direction === 'prev' ? prev - 1 : prev + 1) : prev)
+  }, [cycleNumber])
 
   const updateIssueState = useCallback(async (issueId: string, stateId: string) => {
     if (!linearClient) return
 
-    // Optimistic update
     setIssues(prev => {
       const updated = { ...prev }
       let movedIssue: DashboardIssue | null = null
 
-      // Remove from current category
       for (const key of Object.keys(updated) as StatusCategory[]) {
         const idx = updated[key].findIndex(i => i.id === issueId)
         if (idx !== -1) {
@@ -184,7 +194,6 @@ export function useLinear(): UseLinearResult {
       return updated
     })
 
-    // API call — use raw GraphQL mutation
     await linearClient.client.rawRequest(
       `mutation IssueUpdate($id: String!, $input: IssueUpdateInput!) { issueUpdate(id: $id, input: $input) { success } }`,
       { id: issueId, input: { stateId } }
@@ -192,8 +201,8 @@ export function useLinear(): UseLinearResult {
   }, [workflowStates])
 
   const refresh = useCallback(() => {
-    fetchData(cycleNumber ?? undefined)
-  }, [fetchData, cycleNumber])
+    fetchData()
+  }, [fetchData])
 
   return { issues, cycle, workflowStates, loading, error, navigateCycle, updateIssueState, refresh }
 }
