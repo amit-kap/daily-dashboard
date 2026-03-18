@@ -13,6 +13,8 @@ const PRIORITY_LABELS: Record<number, string> = {
 }
 
 export default function TaskDrawer({ issue, workflowStates, onClose, onStatusChange }: TaskDrawerProps) {
+  const [copied, setCopied] = useState(false)
+
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     document.addEventListener('keydown', handleKey)
@@ -22,8 +24,6 @@ export default function TaskDrawer({ issue, workflowStates, onClose, onStatusCha
   if (!issue) return null
 
   const priorityColor = PRIORITY_COLORS[issue.priority]
-
-  const [copied, setCopied] = useState(false)
 
   const handleClaude = () => {
     navigator.clipboard.writeText(`claude "Work on: ${issue.identifier} - ${issue.title}"`)
@@ -83,6 +83,28 @@ export default function TaskDrawer({ issue, workflowStates, onClose, onStatusCha
               {PRIORITY_LABELS[issue.priority] || 'None'}
             </span>
           </div>
+
+          {/* Description */}
+          {issue.description && (
+            <div className="mb-3.5">
+              <div className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase tracking-wide mb-0.5">Description</div>
+              <div className="text-[12px] text-zinc-600 dark:text-zinc-400 leading-relaxed whitespace-pre-wrap">{issue.description}</div>
+            </div>
+          )}
+
+          {/* Labels */}
+          {issue.labels.length > 0 && (
+            <div className="mb-3.5">
+              <div className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase tracking-wide mb-1">Labels</div>
+              <div className="flex gap-1 flex-wrap">
+                {issue.labels.map(l => (
+                  <span key={l.id} className="text-[10px] font-medium px-2 py-0.5 rounded bg-zinc-200/60 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">
+                    {l.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Status + change */}
           <div className="mb-3.5">

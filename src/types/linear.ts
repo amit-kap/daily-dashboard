@@ -3,6 +3,7 @@ export interface DashboardIssue {
   identifier: string
   title: string
   url: string
+  description: string | null
   priority: number // 0=None, 1=Urgent, 2=High, 3=Medium, 4=Low
   state: {
     id: string

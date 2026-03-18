@@ -114,6 +114,7 @@ export function useLinear(): UseLinearResult {
           identifier: issue.identifier,
           title: issue.title,
           url: issue.url,
+          description: issue.description ?? null,
           priority: issue.priority,
           state: { id: state.id, name: state.name, type: state.type },
           labels: labelsConn.nodes.map(l => ({ id: l.id, name: l.name })),

@@ -43,6 +43,7 @@ export default function LinearWidget() {
   }
 
   return (
+  <>
     <div className="w-80 h-[420px] border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-[#09090b] flex flex-col overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-3.5 pt-3 pb-2">
@@ -75,15 +76,17 @@ export default function LinearWidget() {
         )}
       </div>
 
-      {/* Drawer */}
-      <TaskDrawer
-        issue={selectedIssue}
-        workflowStates={workflowStates}
-        onClose={() => setSelectedIssue(null)}
-        onStatusChange={(issueId, stateId) => {
-          updateIssueState(issueId, stateId)
-        }}
-      />
     </div>
+
+    {/* Drawer — rendered outside widget to avoid overflow clipping */}
+    <TaskDrawer
+      issue={selectedIssue}
+      workflowStates={workflowStates}
+      onClose={() => setSelectedIssue(null)}
+      onStatusChange={(issueId, stateId) => {
+        updateIssueState(issueId, stateId)
+      }}
+    />
+  </>
   )
 }
