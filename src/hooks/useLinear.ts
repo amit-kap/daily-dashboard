@@ -18,7 +18,7 @@ const ISSUES_QUERY = `
     viewer {
       id
       assignedIssues(
-        filter: { state: { type: { nin: ["cancelled"] } } }
+        filter: { state: { type: { in: ["unstarted", "started"] } } }
         first: 100
         orderBy: updatedAt
       ) {
@@ -123,6 +123,7 @@ export function useLinear(): UseLinearResult {
         todo: [], inProgress: [], inReview: [], deployed: [],
       }
 
+      // Active issues (unstarted + started)
       for (const issue of viewer.assignedIssues.nodes) {
         if (!issue.state) continue
         const category = categorizeState(issue.state)
@@ -146,6 +147,7 @@ export function useLinear(): UseLinearResult {
 
       setIssues(grouped)
     } catch (err) {
+      console.error('Linear fetch error:', err)
       const message = err instanceof Error ? err.message : 'Failed to fetch data'
       if (message.includes('authentication') || message.includes('401')) {
         setError('Invalid API key')
