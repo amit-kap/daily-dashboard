@@ -60,7 +60,7 @@ export function useLinear(): UseLinearResult {
           const cycles = await team.cycles({ filter: { number: { eq: targetCycleNumber } } })
           if (cycles.nodes.length > 0) {
             const c = cycles.nodes[0]
-            targetCycle = { id: c.id, number: c.number, startsAt: c.startsAt, endsAt: c.endsAt }
+            targetCycle = { id: c.id, number: c.number, startsAt: c.startsAt.toISOString(), endsAt: c.endsAt.toISOString() }
             break
           }
         }
@@ -72,8 +72,8 @@ export function useLinear(): UseLinearResult {
             targetCycle = {
               id: activeCycle.id,
               number: activeCycle.number,
-              startsAt: activeCycle.startsAt,
-              endsAt: activeCycle.endsAt,
+              startsAt: activeCycle.startsAt.toISOString(),
+              endsAt: activeCycle.endsAt.toISOString(),
             }
             break
           }
@@ -183,8 +183,11 @@ export function useLinear(): UseLinearResult {
       return updated
     })
 
-    // API call
-    await linearClient.issueUpdate(issueId, { stateId })
+    // API call — use raw GraphQL mutation
+    await linearClient.client.rawRequest(
+      `mutation IssueUpdate($id: String!, $input: IssueUpdateInput!) { issueUpdate(id: $id, input: $input) { success } }`,
+      { id: issueId, input: { stateId } }
+    )
   }, [workflowStates])
 
   const refresh = useCallback(() => {
