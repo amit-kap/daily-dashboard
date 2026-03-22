@@ -1,73 +1,70 @@
-# React + TypeScript + Vite
+# Daily Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Personal morning dashboard PWA that aggregates work context from multiple sources into a single view.
 
-Currently, two official plugins are available:
+## What it does
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+A scheduled Claude Code agent runs at 9 AM (Sun–Thu) and gathers data from 6 sources via MCP tools:
 
-## React Compiler
+- **Linear** — assigned issues, cycle progress, comments, relations
+- **Slack** — mentions, project channel activity
+- **Notion** — related PRDs and docs
+- **Fireflies** — meeting action items and keywords
+- **Google Calendar** — today's events with smart insights
+- **Gmail** — unread emails
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+The agent cross-references everything, scores and ranks tasks, then writes JSON files to `public/data/`. The dashboard reads those files — no browser-side API calls.
 
-## Expanding the ESLint configuration
+## Widgets
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+| Widget | Description |
+|--------|-------------|
+| **My Tasks** | Ranked task list with agent reasoning, source icons, and a detail drawer |
+| **Linear Cycle** | Current cycle progress bar, status counters (To Do / Progress / Review / Done) |
+| **Calendar** | Today's meetings with time, attendees, duration, and agent-generated insights |
+| **Gmail** | Unread mail with Yesterday / All toggle |
+| **Recent Work** | Summary of Claude Code sessions from the last 2 days |
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Stack
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+- React 19 + Vite 8 + TypeScript
+- Tailwind CSS v4 (`@tailwindcss/vite`)
+- shadcn/ui with `@base-ui/react` primitives
+- DM Sans + DM Mono fonts
+- PWA via `vite-plugin-pwa`
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Data flow
+
+```
+Scheduled task (9 AM)
+  → Claude Code with MCP tools
+  → Queries Linear, Slack, Notion, Fireflies, Calendar, Gmail
+  → Writes 4 JSON files to public/data/
+  → Dashboard reads JSON at runtime
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Setup
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+```bash
+npm install
+npm run dev
+```
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Data files in `public/data/` are gitignored (contain personal data). The dashboard shows empty states until the agent runs.
+
+## Project structure
+
+```
+src/
+  widgets/          — 5 widget components
+  hooks/            — data fetching hooks (read JSON)
+  components/ui/    — shadcn/ui primitives
+  types/            — TypeScript types
+scripts/
+  dashboard-agent-prompt.md  — full agent prompt for data gathering
+public/data/
+  recommendations.json       — ranked tasks (gitignored)
+  calendar.json              — today's events (gitignored)
+  gmail.json                 — unread emails (gitignored)
+  recent-work.json           — session summaries (gitignored)
 ```
