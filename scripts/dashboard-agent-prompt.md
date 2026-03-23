@@ -199,24 +199,39 @@ Format `ts` as relative time (e.g., "2h ago", "yesterday", "3d ago").
 
 ### Data Gathering
 
-Read Claude Code conversation history from `~/.claude/projects/-Users-amitka-Development-daily-dashboard/`. Each `.jsonl` file is a session. For each file modified in the last 2 days:
+Run `git log` on each project folder in `~/Development/` to collect yesterday's commits:
 
-1. Read the first few lines to extract the conversation topic/name
-2. Scan for key actions (files edited, commands run, features built)
-3. Estimate duration from first to last message timestamp
+```bash
+for dir in ~/Development/*/; do
+  if [ -d "$dir/.git" ]; then
+    git -C "$dir" log --since="YESTERDAY_START" --until="TODAY_START" --pretty=format:"%s" --no-merges
+  fi
+done
+```
+
+Replace `YESTERDAY_START` and `TODAY_START` with actual ISO dates for yesterday 00:00 and today 00:00.
+
+For each folder that has commits:
+1. Collect all commit messages
+2. Write a 1-2 sentence summary of what was accomplished (focus on outcomes, not individual commits)
+3. Sort projects by commit count descending
 
 ### Output Format
 
 ```json
 {
   "generatedAt": "ISO timestamp",
-  "sessionCount": 3,
-  "sessionNames": ["Session 1 name", "Session 2 name", "Session 3 name"],
-  "summary": "First paragraph describing main work done.\n\nSecond paragraph with more details.\n\nThird paragraph if needed."
+  "projects": [
+    {
+      "folder": "comp-lib",
+      "commits": 9,
+      "summary": "Built Vendors Page with data table and vendor card. Created PageCard compound component with drill-down system."
+    }
+  ]
 }
 ```
 
-The `summary` is a short narrative (2-4 paragraphs separated by `\n\n`). Each paragraph corresponds to the session name at the same index in `sessionNames` — the UI displays the session name as a title above each paragraph. Keep each paragraph to 1-2 sentences. Focus on outcomes (what was built/fixed/shipped), not process. Only include sessions from the last 2 days.
+Each entry in `projects` is a folder from `~/Development/` that had commits yesterday. Keep summaries concise — focus on what was built/fixed/shipped, not process.
 
 ---
 

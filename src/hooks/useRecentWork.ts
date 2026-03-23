@@ -1,9 +1,13 @@
 import { useState, useEffect } from 'react'
 
-export interface RecentWork {
-  sessionCount: number
-  sessionNames: string[]
+export interface ProjectWork {
+  folder: string
+  commits: number
   summary: string
+}
+
+export interface RecentWork {
+  projects: ProjectWork[]
 }
 
 export function useRecentWork() {
@@ -14,9 +18,7 @@ export function useRecentWork() {
     fetch('/data/recent-work.json')
       .then(r => r.json())
       .then(d => setData({
-        sessionCount: d.sessionCount || 0,
-        sessionNames: d.sessionNames || [],
-        summary: d.summary || '',
+        projects: d.projects || [],
       }))
       .catch(() => {})
       .finally(() => setLoading(false))

@@ -14,6 +14,10 @@ export default defineConfig({
     },
     dedupe: ['react', 'react-dom'],
   },
+  server: {
+    port: 5100,
+    strictPort: true,
+  },
   plugins: [
     react(),
     tailwindcss(),
